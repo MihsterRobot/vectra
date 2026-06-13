@@ -8,17 +8,23 @@ index = pc.Index(settings.pinecone_index_name)
 
 
 async def upsert_chunks(chunks: list[dict], namespace: str) -> None:
-    index.upsert(vectors=chunks, namespace=namespace)
+    records = [
+        {
+            'id': chunk['id'],
+            'text': chunk['metadata']['text']
+        }
+        for chunk in chunks
+    ]
+    index.upsert_records(namespace=namespace, records=records)
 
 
-async def retrieve_chunks(question: str, user_id: int, document_id: int | None = None) -> list[str]:
-    namespace = f'user_{user_id}' if document_id is None else f'user_{user_id}_doc_{document_id}'
-
-    results = index.query(
-        namespace=namespace,
-        top_k=5,
-        include_metadata=True,
-        inputs={'text': question}
-    )
-
-    return [match['metadata']['text'] for match in results.get('matches', []) if 'text' in match.get('metadata', {})]
+async def retrieve_chunks(question: str, namespaces: list[str]) -> list[str]:
+    all_chunks = []
+    for namespace in namespaces:
+        results = index.search(
+            namespace=namespace,
+            query={'inputs': {'text': question}, 'top_k': 5},
+            fields=['text']
+        )
+        all_chunks.extend([hit['fields']['text'] for hit in results.result.hits])
+    return all_chunks
