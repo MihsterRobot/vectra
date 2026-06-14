@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 
@@ -15,11 +17,24 @@ async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> dict[str, Any]:
+    '''Uploads a document, chunks it, and stores embeddings in Pinecone.
+
+    Args:
+        file: The uploaded file, must be a PDF or plain text.
+        db: The database session.
+        current_user: The authenticated user.
+
+    Returns:
+        A dictionary containing the new document's id and filename.
+
+    Raises:
+        HTTPException: 400 if the file type is not supported.
+    '''
     if file.content_type not in ('application/pdf', 'text/plain'):
         raise HTTPException(status_code=400, detail='Only PDF and plain text files are supported')
 
-    namespace = await process_document(file, current_user.id)
+    namespace = await process_document(file, current_user.id)  # type: ignore
 
     document = Document(
         filename=file.filename,
@@ -38,7 +53,16 @@ async def upload_document(
 def list_documents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> list[dict[str, Any]]:
+    '''Lists all documents belonging to the current user.
+
+    Args:
+        db: The database session.
+        current_user: The authenticated user.
+
+    Returns:
+        A list of dictionaries containing each document's id, filename, and created_at.
+    '''
     documents = db.query(Document).filter(Document.owner_id == current_user.id).all()
     return [{'id': doc.id, 'filename': doc.filename, 'created_at': doc.created_at} for doc in documents]
 
@@ -48,7 +72,17 @@ async def delete_document(
     document_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> None:
+    '''Deletes a document and its associated Pinecone embeddings.
+
+    Args:
+        document_id: The ID of the document to delete.
+        db: The database session.
+        current_user: The authenticated user.
+
+    Raises:
+        HTTPException: 404 if the document is not found or does not belong to the current user.
+    '''
     document = db.query(Document).filter(
         Document.id == document_id,
         Document.owner_id == current_user.id

@@ -22,7 +22,25 @@ async def query(
     payload: QueryRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-):
+) -> dict[str, str]:
+    '''Queries the user's documents using natural language.
+
+    Retrieves relevant chunks from Pinecone based on the question and passes
+    them to Claude to generate a response. If a document_id is provided, only
+    that document is queried. Otherwise, all of the user's documents are searched.
+
+    Args:
+        payload: The query payload containing the question and optional document_id.
+        db: The database session.
+        current_user: The authenticated user.
+
+    Returns:
+        A dictionary containing the generated answer.
+
+    Raises:
+        HTTPException: 400 if the question is empty.
+        HTTPException: 404 if the document is not found, or no relevant content is returned.
+    '''
     if not payload.question.strip():
         raise HTTPException(status_code=400, detail='Question cannot be empty')
 
