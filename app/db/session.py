@@ -1,5 +1,7 @@
+from typing import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase
 
 from app.core.config import settings
 
@@ -12,7 +14,12 @@ class Base(DeclarativeBase):
     pass
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
+    '''Yields a database session and ensures it is closed after use.
+
+    Yields:
+        A SQLAlchemy database session.
+    '''
     db = SessionLocal()
     try:
         yield db
